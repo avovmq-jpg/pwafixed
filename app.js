@@ -1,10 +1,50 @@
-const STORAGE_KEY="routeTrackerData.v2";
+async function loadCustomersFromDB() {
+  const { data, error } = await window.supabase
+    .from('customers')
+    .select('*')
+    .order('name')
+
+  if (error) {
+    console.error(error)
+    return []
+  }
+
+  return data
+}
+
+async function loadClustersFromDB() {
+  const { data, error } = await window.supabase
+    .from('clusters')
+    .select('*')
+    .order('sequence_order')
+
+  if (error) {
+    console.error(error)
+    return []
+  }
+
+  return data
+}const STORAGE_KEY="routeTrackerData.v2";
 const DEFAULTS={settings:{startTime:"08:30",dailyTarget:20,cycle:{visitsRequired:2,windowDays:21},targets:{East:35,North:35}},clusters:[],customers:[],visits:[],todayList:[],clusterProgress:{completed:{}}};
 const byId=(id)=>document.getElementById(id);
 const safeParse=(s)=>{try{return JSON.parse(s);}catch{return null;}};
 const todayISO=()=>new Date().toISOString().slice(0,10);
 const nowISO=()=>new Date().toISOString();
 let state=(()=>{const raw=localStorage.getItem(STORAGE_KEY);const p=raw?safeParse(raw):null;return p?p:structuredClone(DEFAULTS);})();
+async function initialiseApp() {
+  const customers = await loadCustomersFromDB()
+  const clusters = await loadClustersFromDB()
+
+  window.appData = {
+    customers,
+    clusters
+  }
+
+  renderCustomers(customers)
+  generateTodayList(customers, clusters)
+}
+
+initialiseApp()
 function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state));renderAll();}
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',\"'\":'&#39;'}[m]));}
 function computeCompliance(c){if(!c.existing)return{status:"prospect",label:"Prospect",dot:"gray"};const w=state.settings.cycle.windowDays,req=state.settings.cycle.visitsRequired;const cutoff=new Date();cutoff.setDate(cutoff.getDate()-w);const recent=(c.visitHistory||[]).filter(v=>new Date(v.date)>=cutoff);const n=recent.length;if(n>=req)return{status:"compliant",label:"Compliant",dot:"green"};if(n===req-1)return{status:"due",label:"Due",dot:"amber"};return{status:"overdue",label:"Overdue",dot:"red"};}
